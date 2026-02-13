@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<!--
+    PURPLE TEAM - In-Browser JS Execution Runner
+    This page loads and executes a test sample in the browser context,
+    capturing and displaying all console output in real time.
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Applying Security Update...</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0a0a1a;
+            color: #00ff41;
+            min-height: 100vh;
+            padding: 30px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            font-size: 20px;
+            color: #fff;
+            margin-bottom: 8px;
+        }
+        .header .subtitle {
+            font-size: 13px;
+            color: #888;
+        }
+        .progress-container {
+            background: #1a1a2e;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .progress-bar-outer {
+            background: #333;
+            border-radius: 4px;
+            height: 8px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+        .progress-bar-inner {
+            background: linear-gradient(90deg, #00ff41, #0984e3);
+            height: 100%;
+            width: 0%;
+            transition: width 0.5s ease;
+            border-radius: 4px;
+        }
+        .progress-text {
+            font-size: 13px;
+            color: #aaa;
+            margin-top: 8px;
+        }
+        .console-output {
+            background: #0d0d0d;
+            border: 1px solid #1a1a2e;
+            border-radius: 8px;
+            padding: 16px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.6;
+            max-height: 500px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .console-output .log { color: #00ff41; }
+        .console-output .warn { color: #ffc107; }
+        .console-output .error { color: #ff4444; }
+        .console-output .info { color: #0984e3; }
+        .pt-banner {
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            background: #6c5ce7;
+            color: white;
+            text-align: center;
+            padding: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            z-index: 2000;
+        }
+        .back-link {
+            display: inline-block;
+            margin-top: 15px;
+            color: #0984e3;
+            text-decoration: none;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>&#9881; Installing Security Update...</h1>
+        <div class="subtitle" id="sampleName">Loading module...</div>
+    </div>
+
+    <div class="progress-container">
+        <div>Status: <span id="statusText">Initializing...</span></div>
+        <div class="progress-bar-outer">
+            <div class="progress-bar-inner" id="progressBar"></div>
+        </div>
+        <div class="progress-text" id="progressText">0% complete</div>
+    </div>
+
+    <div class="console-output" id="consoleOutput"></div>
+
+    <a href="index.html" class="back-link">&larr; Return to update center</a>
+
+    <div class="pt-banner">
+        &#128156; PURPLE TEAM EXERCISE &mdash; JS is executing in-browser for detection testing.
+        All network calls target localhost.
+    </div>
+
+    <script>
+        // --- Intercept console methods to display output on page ---
+        var outputEl = document.getElementById('consoleOutput');
+        var progressBar = document.getElementById('progressBar');
+        var progressText = document.getElementById('progressText');
+        var statusText = document.getElementById('statusText');
+        var sampleNameEl = document.getElementById('sampleName');
+        var lineCount = 0;
+
+        function appendLine(text, className) {
+            lineCount++;
+            var line = document.createElement('div');
+            line.className = className || 'log';
+            line.textContent = '[' + new Date().toLocaleTimeString() + '] ' + text;
+            outputEl.appendChild(line);
+            outputEl.scrollTop = outputEl.scrollHeight;
+
+            // Animate progress bar
+            var pct = Math.min(lineCount * 8, 100);
+            progressBar.style.width = pct + '%';
+            progressText.textContent = pct + '% complete';
+            if (pct >= 100) {
+                statusText.textContent = 'Complete';
+            }
+        }
+
+        // Override console methods
+        var _origLog = console.log;
+        var _origWarn = console.warn;
+        var _origError = console.error;
+        var _origInfo = console.info;
+
+        console.log = function() {
+            var msg = Array.prototype.slice.call(arguments).join(' ');
+            appendLine(msg, 'log');
+            _origLog.apply(console, arguments);
+        };
+        console.warn = function() {
+            var msg = Array.prototype.slice.call(arguments).join(' ');
+            appendLine(msg, 'warn');
+            _origWarn.apply(console, arguments);
+        };
+        console.error = function() {
+            var msg = Array.prototype.slice.call(arguments).join(' ');
+            appendLine(msg, 'error');
+            _origError.apply(console, arguments);
+        };
+        console.info = function() {
+            var msg = Array.prototype.slice.call(arguments).join(' ');
+            appendLine(msg, 'info');
+            _origInfo.apply(console, arguments);
+        };
+
+        // --- Determine which sample to load from URL parameter ---
+        var params = new URLSearchParams(window.location.search);
+        var sample = params.get('sample') || 'sample1_obfuscated_dropper.js';
+
+        var sampleNames = {
+            'sample1_obfuscated_dropper.js': 'Obfuscated Dropper Simulation',
+            'sample2_credential_harvester.js': 'Credential Harvester Simulation',
+            'sample3_cryptominer_sim.js': 'Cryptominer Simulation',
+            'sample4_exploit_kit_landing.js': 'Exploit Kit Landing Simulation',
+            'sample5_c2_beacon.js': 'C2 Beacon Simulation'
+        };
+
+        sampleNameEl.textContent = sampleNames[sample] || sample;
+        statusText.textContent = 'Loading ' + sample + '...';
+        appendLine('Loading module: ' + sample, 'info');
+
+        // --- Dynamically load the JS sample (this is the key detection trigger) ---
+        var script = document.createElement('script');
+        script.src = sample;
+        script.onload = function() {
+            appendLine('Module loaded and executed successfully.', 'info');
+            statusText.textContent = 'Update applied';
+            progressBar.style.width = '100%';
+            progressText.textContent = '100% complete';
+        };
+        script.onerror = function() {
+            appendLine('ERROR: Failed to load module. File may have been blocked.', 'error');
+            statusText.textContent = 'Failed - blocked by security controls?';
+            progressBar.style.background = '#ff4444';
+        };
+        document.body.appendChild(script);
+    </script>
+</body>
+</html>
